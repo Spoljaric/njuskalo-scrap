@@ -1,32 +1,46 @@
-from multiprocessing.pool import ThreadPool
-
 from torpy.http.requests import tor_requests_session
 from bs4 import BeautifulSoup
 
 
-def fire_threaded_calls(array_of_links):
-    car_page_array = []
+def scrap_car_links(array_of_links, car_page_array):
     with tor_requests_session() as s:
-        with ThreadPool(5) as pool:
-            tasks = pool.map(s.get, array_of_links)
-            pool.close()
-            pool.join()
-            for task in tasks:
-                soup = BeautifulSoup(task.text, 'html.parser')
-                if 'ShieldSquare Captcha' == soup.find('title').string:
-                    print('Beep, boop. Site is asking for captcha! Yikes')
-                else:
-                    div = soup.findAll("h3", {"class": "entity-title"})
-                    for h3 in div:
-                        current_car = task.url.split('/')[-1]
-                        if current_car in h3.next.attrs['href']:
-                            car_page_array.append(h3.next.attrs['href'])
-                    if len(array_of_links) > 0:
-                        array_of_links.remove(task.url)
-                if len(array_of_links) > 0:
-                    print('Not all calls finished successfully. Trying again! Count: ' + str(len(array_of_links)))
-                    fire_threaded_calls(array_of_links)
+        for car in array_of_links:
+            print('calling task: ' + car)
+            html = s.get(car)
+            soup = BeautifulSoup(html.text, 'html.parser')
+            if 'ShieldSquare Captcha' == soup.find('title').string:
+                print('Beep, boop. Site is asking for captcha! Yikes')
+            else:
+                div = soup.findAll("h3", {"class": "entity-title"})
+                for h3 in div:
+                    current_car = html.url.split('/')[-1]
+                    if current_car in h3.next.attrs['href']:
+                        car_page_array.append('https://www.njuskalo.hr' + h3.next.attrs['href'])
+                array_of_links.remove(car)
+            if len(
+                    array_of_links) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
+                scrap_car_links(array_of_links, car_page_array)
     return car_page_array
+
+
+def scrap_individual_info(array_of_individual_cars, info):
+    with tor_requests_session() as s:
+        for car in array_of_individual_cars:
+            print('calling task: ' + car)
+            html = s.get(car)
+            soup = BeautifulSoup(html.text, 'html.parser')
+            if 'ShieldSquare Captcha' == soup.find('title').string:
+                print('Beep, boop. Site is asking for captcha! Yikes')
+            else:
+                div = soup.findAll("dl", {"class": "ClassifiedDetailHighlightedAttributes-listItemInner"})
+                for item in div:
+                    print(item)
+                    info.append(item)
+                array_of_individual_cars.remove(car)
+            if len(
+                    array_of_individual_cars) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
+                scrap_car_links(array_of_individual_cars, info)
+    return info
 
 
 if __name__ == '__main__':
@@ -35,14 +49,17 @@ if __name__ == '__main__':
         'Corvette': 'chevrolet-corvette',
         'Mazda RX-8': 'mazda-rx-8',
         'Ford Mustang': 'ford-mustang',
-        'BMW 4 series LCI': 'bmw-serija-4-coupe?yearManufactured%5Bmin%5D=2017'
+        'Dodge Charger': 'dodge-charger',
+        'Chevrolet Camaro': 'chevrolet-camaro'
     }
     arrayOfLinks = []
     print('Script init')
     url = 'https://www.njuskalo.hr/auti/{car}'
     for key, value in dictionaryOfInterestingCars.items():
         arrayOfLinks.append(url.replace("{car}", value))
-    arrayOfCars = fire_threaded_calls(arrayOfLinks)
+    array_of_cars = scrap_car_links(arrayOfLinks, [])
+    individual_info = scrap_individual_info(array_of_cars, [])
+    print(individual_info)
     # TODO: Fire calls to individual pages, array result:
     # 00 = {str} '/auti/toyota-mr2-2.0-gti-16v-reg-11-2020-jako-dobro-stanje-oglas-31503431'
     # 01 = {str} '/auti/toyota-mr2-oglas-29535763'
