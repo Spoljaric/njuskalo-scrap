@@ -1,3 +1,5 @@
+import re
+
 from torpy.http.requests import tor_requests_session
 from bs4 import BeautifulSoup
 
@@ -18,35 +20,34 @@ def scrap_car_links(array_of_links, car_page_array):
                         if current_car in h3.next.attrs['href']:
                             car_page_array.append('https://www.njuskalo.hr' + h3.next.attrs['href'])
                     array_of_links.remove(car)
-                if len(
-                        array_of_links) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
+                if len(array_of_links) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
                     scrap_car_links(array_of_links, car_page_array)
             except:
                 scrap_car_links(array_of_links, car_page_array)
     return car_page_array
 
 
-def scrap_individual_info(array_of_individual_cars, info):
+def scrap_individual_info(array_of_individual_cars, info, tuple_of_infos):
     with tor_requests_session() as s:
-        for car in array_of_individual_cars:
+        for single_car in array_of_individual_cars:
             try:
-                print('calling task: ' + car)
-                html = s.get(car)
+                print('calling task: ' + single_car)
+                html = s.get(single_car)
                 soup = BeautifulSoup(html.text, 'html.parser')
                 if 'ShieldSquare Captcha' == soup.find('title').string:
                     print('Beep, boop. Site is asking for captcha! Yikes')
                 else:
+                    array_of_individual_cars.remove(single_car)
                     div = soup.findAll("dl", {"class": "ClassifiedDetailHighlightedAttributes-listItemInner"})
                     for item in div:
-                        print(item)
-                        info.append(item)
-                    scrap_individual_info.remove(car)
-                if len(
-                        array_of_individual_cars) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
-                    scrap_individual_info(array_of_individual_cars, info)
+                        title = item.find("dt", {"class": "ClassifiedDetailHighlightedAttributes-label"})
+                        val = item.find("dd", {"class": "ClassifiedDetailHighlightedAttributes-text"})
+                        tuple_of_infos.append(tuple((title.text, re.sub(r"[\n\t\s]*", "", val.text))))
+                if len(array_of_individual_cars) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
+                    scrap_individual_info(array_of_individual_cars, info, tuple_of_infos)
             except:
-                scrap_individual_info(array_of_individual_cars, info)
-    return info
+                scrap_individual_info(array_of_individual_cars, info, tuple_of_infos)
+    return tuple_of_infos
 
 
 if __name__ == '__main__':
@@ -64,7 +65,7 @@ if __name__ == '__main__':
     for key, value in dictionaryOfInterestingCars.items():
         arrayOfLinks.append(url.replace("{car}", value))
     array_of_cars = scrap_car_links(arrayOfLinks, [])
-    individual_info = scrap_individual_info(array_of_cars, [])
+    individual_info = scrap_individual_info(array_of_cars, [], [])
     print(individual_info)
     # TODO: Fire calls to individual pages, array result:
     # 00 = {str} '/auti/toyota-mr2-2.0-gti-16v-reg-11-2020-jako-dobro-stanje-oglas-31503431'
