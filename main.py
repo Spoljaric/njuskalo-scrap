@@ -6,19 +6,22 @@ def scrap_car_links(array_of_links, car_page_array):
     with tor_requests_session() as s:
         for car in array_of_links:
             print('calling task: ' + car)
-            html = s.get(car)
-            soup = BeautifulSoup(html.text, 'html.parser')
-            if 'ShieldSquare Captcha' == soup.find('title').string:
-                print('Beep, boop. Site is asking for captcha! Yikes')
-            else:
-                div = soup.findAll("h3", {"class": "entity-title"})
-                for h3 in div:
-                    current_car = html.url.split('/')[-1]
-                    if current_car in h3.next.attrs['href']:
-                        car_page_array.append('https://www.njuskalo.hr' + h3.next.attrs['href'])
-                array_of_links.remove(car)
-            if len(
-                    array_of_links) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
+            try:
+                html = s.get(car)
+                soup = BeautifulSoup(html.text, 'html.parser')
+                if 'ShieldSquare Captcha' == soup.find('title').string:
+                    print('Beep, boop. Site is asking for captcha! Yikes')
+                else:
+                    div = soup.findAll("h3", {"class": "entity-title"})
+                    for h3 in div:
+                        current_car = html.url.split('/')[-1]
+                        if current_car in h3.next.attrs['href']:
+                            car_page_array.append('https://www.njuskalo.hr' + h3.next.attrs['href'])
+                    array_of_links.remove(car)
+                if len(
+                        array_of_links) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
+                    scrap_car_links(array_of_links, car_page_array)
+            except:
                 scrap_car_links(array_of_links, car_page_array)
     return car_page_array
 
@@ -26,20 +29,23 @@ def scrap_car_links(array_of_links, car_page_array):
 def scrap_individual_info(array_of_individual_cars, info):
     with tor_requests_session() as s:
         for car in array_of_individual_cars:
-            print('calling task: ' + car)
-            html = s.get(car)
-            soup = BeautifulSoup(html.text, 'html.parser')
-            if 'ShieldSquare Captcha' == soup.find('title').string:
-                print('Beep, boop. Site is asking for captcha! Yikes')
-            else:
-                div = soup.findAll("dl", {"class": "ClassifiedDetailHighlightedAttributes-listItemInner"})
-                for item in div:
-                    print(item)
-                    info.append(item)
-                array_of_individual_cars.remove(car)
-            if len(
-                    array_of_individual_cars) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
-                scrap_car_links(array_of_individual_cars, info)
+            try:
+                print('calling task: ' + car)
+                html = s.get(car)
+                soup = BeautifulSoup(html.text, 'html.parser')
+                if 'ShieldSquare Captcha' == soup.find('title').string:
+                    print('Beep, boop. Site is asking for captcha! Yikes')
+                else:
+                    div = soup.findAll("dl", {"class": "ClassifiedDetailHighlightedAttributes-listItemInner"})
+                    for item in div:
+                        print(item)
+                        info.append(item)
+                    scrap_individual_info.remove(car)
+                if len(
+                        array_of_individual_cars) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
+                    scrap_individual_info(array_of_individual_cars, info)
+            except:
+                scrap_individual_info(array_of_individual_cars, info)
     return info
 
 
