@@ -6,14 +6,6 @@ from bs4 import BeautifulSoup
 
 
 class Car:
-    def __init__(self, href, year, odometer, power, engine, transmission):
-        self.href = href
-        self.year = year
-        self.odometer = odometer
-        self.power = power
-        self.engine = engine
-        self.transmission = transmission
-
     def to_json(self):
         return json.dumps(self, default=lambda o: o.__dict__,
                           sort_keys=True)
@@ -60,10 +52,16 @@ def scrap_individual_info(array_of_individual_cars, info, tuple_of_infos):
                     tuple_of_infos.append(tuple(('link', single_car)))
                     div = soup.findAll("dl", {"class": "ClassifiedDetailHighlightedAttributes-listItemInner"})
                     array_of_individual_cars.remove(single_car)
+                    car_obj = Car()
                     for item in div:
                         title = item.find("dt", {"class": "ClassifiedDetailHighlightedAttributes-label"})
                         val = item.find("dd", {"class": "ClassifiedDetailHighlightedAttributes-text"})
-                        tuple_of_infos.append(tuple((title.text, re.sub(r"[\n\t\s]*", "", val.text))))
+                        if val is None:
+                            val = title.string
+                            title = 'Mjenjač'
+                            tuple_of_infos.append(tuple((title, val)))
+                        else:
+                            tuple_of_infos.append(tuple((title.text, re.sub(r"[\n\t\s]*", "", val.text))))
                 if len(
                         array_of_individual_cars) > 0:  # Njuskalo will not accept immediate calls with same location so create a new request for every car
                     scrap_individual_info(array_of_individual_cars, info, tuple_of_infos)
